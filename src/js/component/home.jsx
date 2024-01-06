@@ -1,79 +1,100 @@
-import React, { useState } from "react";
 
+import React, { useEffect, useState } from "react";
 
-//include images into your bundle
-
-
-//create your first component
 const Home = () => {
-    const [list, setList] = useState([]); //Array. Lista de items o coleccion de datos.
-    const [newTask, setNewTask] = useState("");
+    const [inputValue, setInputValue] = useState("");
     const [todos, setTodos] = useState([])
-
-    //Despues pones la funcion que queres que se haga cuando haces click. Se puede poner despues del evento,
-    //pero es mejor que quede aca arriba asi se ve mas comodo. Es como que se usa abajo, pero se escribe arriba.
-    function agregarElemento(e) {
-        if (e.keyCode === 13) {  //agrego un condicional para que cada vez que presione la tecla enter (codigo 13) el elemento nuevo se agregue a la lista.
-            setList(oldArray => [...oldArray, {
-                label: newTask, done: false
-            }])
-
-            console.log(list);
-            fetch('https://playground.4geeks.com/apis/fake/todos/user/lisandromariano', {
+    const apiUrl = "https://playground.4geeks.com/apis/fake/todos/user/lisandromariano"
+    const createUser = async () => {
+        try {
+            const response = await fetch(apiUrl, {
                 method: "POST",
-                body: JSON.stringify(todos),
                 headers: {
                     "Content-Type": "application/json"
-                }
-            })
-                .then(resp => {
-                    console.log(resp.ok); // Será true (verdad) si la respuesta es exitosa.
-                    console.log(resp.status); // el código de estado = 200 o código = 400 etc.
-                    console.log(resp.text()); // Intentará devolver el resultado exacto como cadena (string)
-                    return resp.json(); // (regresa una promesa) will try to parse the result as json as return a promise that you can .then for results
-                })
-                .then(data => {
-                    //Aquí es donde debe comenzar tu código después de que finalice la búsqueda
-                    console.log(data); //esto imprimirá en la consola el objeto exacto recibido del servidor
-                })
-                .catch(error => {
-                    //manejo de errores
-                    console.log(error);
-                });
-
-
-
-
-            setNewTask("") //hago que la funcion  setNewTask se actualice a 0 cada vez que apreto la tecla enter.      
+                },
+                body: JSON.stringify([])
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log("usuario creado", data);
+            }
+            else { console.error("error al crear el usuario", response.status) }
         }
-    };
-
-
-
-
-    function eliminar(tarea) {
-        let nuevoArray = list.filter((item) => item !== tarea) //creo un nuevo array con una condicion (!== tarea)  
-        setList(nuevoArray); //llamo a la funcion nuevoArray generado para actualizar a list.
-        /* console.log(tarea); */
-        //filtra todos los elementos menos al que le hacen click
-
+        catch (error) {
+            console.error(error);
+        }
     }
 
+    const getAllTasks = async () => {
+        try {
+            const response = await fetch(apiUrl);
+            if (response.ok) {
+                const data = await response.json();
+                console.log(data);
+                setTodos(data)
+            }
+            else {
+                if (response.status === 404) {
+                    console.log("Usuario no encontrado");
+                    createUser();
+                } else { console.error("error en la solicitus", response.status) }
+            }
+        }
+        catch (error) { console.error }
+    }
 
-  /*   fetch('https://playground.4geeks.com/apis/fake/todos/user/lisandromariano')
-        .then(response => response.json())
-        .then(data => {
-            console.log(data)
-            setTodos(data)
+    const addTask = async (value) => {
+        try {
+            const newTask = {
+                label: value, 
+                done: false
+            };
+            const updatedTask = [...todos, newTask];
+            console.log(updatedTask);
+            const putOptions = {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json", 
+                },
+                body: JSON.stringify(updatedTask), 
+            };
+            const putResponse = await fetch (apiUrl, putOptions);
+            if (putResponse.ok){
+                setInputValue("");
+                getAllTasks();
+            } else {
+                console.error("Error al agregar la tarea")
+            }
+        }
+        catch (error) {console.error("Error al agregar tarea", error)}
+    }
 
-        })
-        .catch(err => err) */
+    const deleteTask = async (id) => {
+        const updatedList = todos.filter((task) => task.id !== id);
+        setTodos (updatedList);
+        if (updatedList.length === 0){
+            const defaultTask = {
+                id: 1, label: "Default Task", done: false, 
+            }
+            updatedList.push(defaultTask)
+        }
+        const options = {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(updatedList),
+        };
+        await fetch (apiUrl, options).then((response) => {
+            if (!response.ok){
+                console.error("Error al actualizar el API")
+            }
+        } )
+    }
 
-
-
-
-
-
+useEffect(()=> {
+    getAllTasks()
+},[])
 
     //Aca debajo en el Return empieza lo que es la parte del HTML, seria la estructura de lo que queres mostrar y el diseño.
     //Pones el estado con el que queres que empiece,
@@ -81,20 +102,38 @@ const Home = () => {
     return (
         <div className="Container">
 
-            <div className="input-group flex-nowrap">
-                <input type="text" className="form-control" onChange={(e) => setNewTask(e.target.value)} onKeyDown={agregarElemento} value={newTask} placeholder="What needs to be done?" aria-label="Username" aria-describedby="addon-wrapping" />
-            </div>
-
-
-            <div className="Otros elementos de la lista">
-                <ul>
-                    {list.map((item, index) => <li key={index}>{item} <span onClick={() => eliminar(item)}>X</span></li>)}
-                </ul>
-                {todos.map((item, index) => { return (<h1>{item.label}</h1>) })}
-            </div>
+            <h1>My Todos</h1>
+            <ul>
+                <li>
+                    <input 
+                        type="text" 
+                        onChange={(e) => setInputValue(e.target.value)} 
+                        value={inputValue} 
+                        onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                            console.log(inputValue);
+                            addTask (inputValue);
+                        }
+                    }}
+                    placeholder="Agregar Tarea"></input>
+                </li>
+                {
+                    todos.map((item) => {
+                        return(
+                            <li key={item.id}>
+                                {`${item.label}`}
+                                <i className="far fa-times-circle" onClick={() => {deleteTask(item.id)}}></i>
+                            </li>
+                        )
+                    }
+    
+                    )
+                }
+            </ul>
         </div>
     )
 }
 
 
 export default Home;
+
